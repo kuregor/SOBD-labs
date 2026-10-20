@@ -37,35 +37,50 @@
 | `SOBD/2024/lab2/2_Logistic_Regression.ipynb` | лабораторная № 2, часть 2: тяжёлое ли ДТП — логистическая регрессия |
 | `SOBD/2024/lab*/README.md` | задания кафедры |
 | `SOBD/2024/CourseWork/` | шаблон курсовой работы кафедры |
-| `SOBD/2024/data/README.md` | описание датасета и таблиц `Iceberg` |
+| `SOBD/2024/data/README.md` | описание датасета и его раскладки в `HDFS` |
+| `SOBD/2024/figures/` | рисунки, которые сохраняют ноутбуки, — для главы курсовой |
+| `SOBD/2024/run_labs.sh` | очередь: выполняет четыре ноутбука строго по одному |
 
 CSV-файлы в репозиторий не входят: исходный датасет скачивается с Kaggle, а `SOBD/2024/lab2/streaming-data.csv`
 (около тысячи записей для следующей лабораторной работы) создаётся ноутбуком классификации.
 
+## Где лежат данные
+
+Все пути ноутбуки строят от папки проекта, поэтому ничего не нужно настраивать вручную:
+
+| Где | Что |
+| --- | --- |
+| `SOBD/2024/data/US_Accidents_March23.csv` | исходный CSV — его нужно положить сюда один раз |
+| `SOBD/2024/figures/` | рисунки |
+| `SOBD/2024/lab2/streaming-data.csv` | выборка для следующей работы |
+| `hdfs:///user/<логин>/SOBD-labs/data/` | CSV в `HDFS` — туда его копирует первый ноутбук |
+| `hdfs:///user/<логин>/SOBD-labs/warehouse/` | таблицы `Iceberg` базы `sobd_accidents` |
+| `hdfs:///user/<логин>/SOBD-labs/models/` | сохранённая модель классификации |
+
 ## Запуск
 
-Архив с Kaggle распаковать в `SOBD/2024/data/original/` и загрузить CSV в `HDFS`:
+Архив с Kaggle распаковать в `SOBD/2024/data/`:
 
 ```bash
-unzip US_Accidents_March23.csv.zip -d SOBD/2024/data/original/
-```
-
-```bash
-hdfs dfs -mkdir -p /datasets/us_accidents
-```
-
-```bash
-hdfs dfs -put SOBD/2024/data/original/US_Accidents_March23.csv /datasets/us_accidents/
+unzip US_Accidents_March23.csv.zip -d SOBD/2024/data/
 ```
 
 Ноутбуки выполняются по порядку: `lab1/1_Data_loading.ipynb` → `lab1/2_Exploratory_analysis.ipynb`
-→ `lab2/1_Random_Forest_Regression.ipynb` → `lab2/2_Logistic_Regression.ipynb`. Таблицы хранятся в базе
-`sobd_accidents` каталога `Iceberg` в `HDFS`, модель — в `hdfs:///user/<пользователь>/models/severity-logreg`.
+→ `lab2/1_Random_Forest_Regression.ipynb` → `lab2/2_Logistic_Regression.ipynb`. Их можно запускать
+по одному в VS Code или все сразу очередью в фоне — она продолжит работу после закрытия VS Code:
 
-Параметры `Spark` в ноутбуках рассчитаны на кластер с 8 ГБ памяти: два исполнителя по два ядра и 1,5 ГБ,
-после перемешивания данные делятся на 16 разделов вместо 200. Полный прогон четырёх ноутбуков занимает
-около 40 минут: 3 + 7 минут лабораторная № 1, 17 + 10 минут лабораторная № 2. Ноутбуки запускаются строго
-по одному — двум приложениям `Spark` памяти такого кластера не хватит.
+```bash
+nohup bash SOBD/2024/run_labs.sh > run_labs.log 2>&1 &
+```
+
+```bash
+tail -f run_labs.log
+```
+
+Ресурсы ноутбуки выбирают сами. На кластере кафедры (узел на 256 ядер и 188 ГБ, им пользуется
+вся группа) — около 12 %: 4 исполнителя по 8 ядер и 6 ГБ. На локальном стенде с 8 ГБ памяти —
+2 исполнителя по 2 ядра и 1,5 ГБ, полный прогон там занимает около 40 минут. В любой момент работает
+только один ноутбук: каждый в конце вызывает `spark.stop()` и освобождает ресурсы.
 
 ## Основные результаты
 
